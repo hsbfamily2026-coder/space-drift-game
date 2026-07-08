@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스페이스 드리프트</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  body {
+    margin: 0;
+    padding: 20px 0;
+    background: #05040a;
+    font-family: 'Orbitron', -apple-system, sans-serif;
+  }
+  #sdGameBox {
+    box-sizing: border-box;
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 12px;
+    text-align: center;
+    background: radial-gradient(ellipse at top, #1b1030 0%, #05040a 70%);
+    border-radius: 16px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    border: 1px solid rgba(180,140,255,.25);
+  }
+  #sdGameBox *, #sdGameBox *::before, #sdGameBox *::after { box-sizing: border-box; }
+  #sdGameBox .sd-title {
+    font-size: 1.15rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    margin: 0 0 8px;
+    background: linear-gradient(90deg, #7ee8ff, #ff7ee0);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  #sdGameBox .sd-hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #cdeaff;
+    font-size: 0.82rem;
+    margin-bottom: 6px;
+    padding: 0 4px;
+    letter-spacing: 0.03em;
+  }
+  #sdGameBox .sd-hud strong { color: #7ee8ff; }
+  #sdGameBox .sd-mute {
+    border: 1px solid rgba(180,140,255,.4);
+    background: rgba(120,80,180,.25);
+    color: #fff;
+    font-size: 0.95rem;
+    padding: 4px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #sdGameBox .sd-mute:hover { background: rgba(150,100,220,.4); }
+  #sdGameBox .sd-canvas-box {
+    position: relative;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(180,140,255,.25), 0 8px 30px rgba(120,60,220,.35);
+    background: #05040a;
+  }
+  #sdGameBox .sd-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: pointer;
+  }
+  #sdGameBox .sd-hint {
+    margin: 10px 0 0;
+    font-size: 0.72rem;
+    color: rgba(210,190,255,.85);
+    letter-spacing: 0.03em;
+  }
+  #sdNameForm {
+    display: none;
+    margin-top: 10px;
+  }
+  #sdNameForm input {
+    padding: 7px 10px;
+    width: 140px;
+    border-radius: 6px;
+    border: 1px solid rgba(180,140,255,.4);
+    background: #150c26;
+    color: #fff;
+    font-family: inherit;
+  }
+  #sdNameForm button {
+    padding: 7px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    border: none;
+    margin-left: 4px;
+    background: linear-gradient(90deg, #7ee8ff, #ff7ee0);
+    color: #150c26;
+    font-weight: 700;
+    font-family: inherit;
+  }
+  #sdLeaderboardBox {
+    margin-top: 14px;
+    text-align: left;
+    background: rgba(120,80,180,.12);
+    border: 1px solid rgba(180,140,255,.2);
+    border-radius: 10px;
+    padding: 10px;
+    color: #e8dbff;
+  }
+  #sdLeaderboardBox .sd-lb-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #ff7ee0;
+    font-size: 0.85rem;
+  }
+  #sdLeaderboard { font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<div id="sdGameBox">
+  <p class="sd-title">✦ SPACE DRIFT ✦</p>
+  <div class="sd-hud">
+    <span>SCORE <strong class="sd-score">0</strong>&nbsp;&nbsp;BEST <strong class="sd-best">0</strong></span>
+    <button type="button" class="sd-mute" aria-label="소리 끄기">🔊</button>
+  </div>
+  <div class="sd-canvas-box">
+    <canvas class="sd-canvas" width="360" height="640" aria-label="스페이스 드리프트 게임"></canvas>
+  </div>
+  <p class="sd-hint">탭 · 클릭 · 스페이스 — 부스터 점화</p>
+
+  <div id="sdNameForm">
+    <input id="sdNameInput" type="text" maxlength="10" placeholder="닉네임 입력">
+    <button id="sdSubmitBtn">랭킹 등록</button>
+  </div>
+
+  <div id="sdLeaderboardBox">
+    <div class="sd-lb-title">🏆 RANKING TOP 10</div>
+    <ol id="sdLeaderboard" style="margin:0;padding-left:20px;"></ol>
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById("sdGameBox");
+  if (!root || root.dataset.sdReady) return;
+  root.dataset.sdReady = "1";
+
+  // ▼▼▼ 배포된 웹앱 주소를 넣으세요 ▼▼▼
+  var SCRIPT_URL = "여기에_배포된_웹앱_URL_붙여넣기";
+  var GAME_NAME = "SpaceDrift"; // 새 테마이므로 랭킹 탭도 새로 분리
+
+  var canvas = root.querySelector(".sd-canvas");
+  var ctx = canvas.getContext("2d");
+  var scoreEl = root.querySelector(".sd-score");
+  var bestEl = root.querySelector(".sd-best");
+  var muteBtn = root.querySelector(".sd-mute");
+  var nameForm = document.getElementById("sdNameForm");
+  var nameInput = document.getElementById("sdNameInput");
+  var submitBtn = document.getElementById("sdSubmitBtn");
+  var leaderboardEl = document.getElementById("sdLeaderboard");
+
+  // ===================== 사운드 (완전히 새로운 우주 테마 사운드) =====================
+  var audio = (function () {
+    var ac, bgmGain, sfxGain, unlocked, muted, bgmStep, bgmNext, bgmTimer;
+    try { muted = localStorage.getItem("sd_mute") === "1"; } catch (e) { muted = false; }
+    // 단조 펜타토닉 느낌의 신비로운 우주 멜로디
+    var MELODY = [220, 261.63, 293.66, 220, 349.23, 293.66, 261.63, 220, 196, 220, 261.63, 220];
+    var BEAT = 0.19;
+
+    function init() {
+      if (ac) return;
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      bgmGain = ac.createGain();
+      sfxGain = ac.createGain();
+      bgmGain.gain.value = muted ? 0 : 0.11;
+      sfxGain.gain.value = muted ? 0 : 0.35;
+      bgmGain.connect(ac.destination);
+      sfxGain.connect(ac.destination);
+    }
+
+    function unlock() {
+      init();
+      if (unlocked) return;
+      unlocked = true;
+      if (ac.state === "suspended") ac.resume();
+      if (!muted) startBgm();
+    }
+
+    function tone(freq, dur, type, dest, start, vol) {
+      var t = start || ac.currentTime;
+      var o = ac.createOscillator();
+      var g = ac.createGain();
+      o.type = type || "triangle";
+      o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(vol || 0.2, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g);
+      g.connect(dest);
+      o.start(t);
+      o.stop(t + dur + 0.03);
+    }
+
+    // 로켓 부스터 점화음: 낮은 화이트노이즈 + 상승 사인파 (기존 '짹' 소리와 완전히 다른 느낌)
+    function boost() {
+      if (muted || !ac) return;
+      var t = ac.currentTime;
+      var o = ac.createOscillator();
+      var g = ac.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(360, t + 0.11);
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.linearRampToValueAtTime(0.3, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      o.connect(g); g.connect(sfxGain);
+      o.start(t); o.stop(t + 0.16);
+
+      var len = Math.floor(ac.sampleRate * 0.12);
+      var buf = ac.createBuffer(1, len, ac.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) * 0.5;
+      var src = ac.createBufferSource();
+      src.buffer = buf;
+      var filt = ac.createBiquadFilter();
+      filt.type = "highpass"; filt.frequency.value = 800;
+      var ng = ac.createGain();
+      ng.gain.setValueAtTime(0.18, t);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      src.connect(filt); filt.connect(ng); ng.connect(sfxGain);
+      src.start(t);
+    }
+
+    function score() {
+      if (muted || !ac) return;
+      var t = ac.currentTime;
+      tone(659.25, 0.07, "sine", sfxGain, t, 0.24);
+      tone(880, 0.1, "sine", sfxGain, t + 0.06, 0.2);
+      tone(1108.73, 0.14, "sine", sfxGain, t + 0.12, 0.16);
+    }
+
+    // 충돌: 낮게 깔리는 디스토션 느낌의 폭발 (기존 '퍽' 소리와 결이 다르게 더 낮고 웅웅거림)
+    function crash() {
+      if (muted || !ac) return;
+      stopBgm();
+      var t = ac.currentTime;
+      var len = Math.floor(ac.sampleRate * 0.5);
+      var buf = ac.createBuffer(1, len, ac.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.6);
+      var src = ac.createBufferSource();
+      src.buffer = buf;
+      var filt = ac.createBiquadFilter();
+      filt.type = "lowpass"; filt.frequency.value = 220;
+      var g = ac.createGain();
+      g.gain.setValueAtTime(0.5, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      src.connect(filt); filt.connect(g); g.connect(sfxGain);
+      src.start(t);
+      tone(65, 0.45, "sawtooth", sfxGain, t, 0.3);
+      tone(48, 0.5, "sine", sfxGain, t + 0.03, 0.25);
+    }
+
+    function tickBgm() {
+      if (!unlocked || muted || !ac) return;
+      var now = ac.currentTime;
+      while (bgmNext < now + 0.12) {
+        var f = MELODY[bgmStep % MELODY.length];
+        tone(f, BEAT * 0.9, "triangle", bgmGain, bgmNext, 0.14);
+        tone(f / 2, BEAT * 0.9, "sine", bgmGain, bgmNext, 0.06);
+        bgmStep++;
+        bgmNext += BEAT;
+      }
+    }
+
+    function startBgm() {
+      if (!ac || muted) return;
+      bgmStep = 0;
+      bgmNext = ac.currentTime + 0.04;
+      if (!bgmTimer) bgmTimer = setInterval(tickBgm, 45);
+    }
+
+    function stopBgm() {
+      if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
+    }
+
+    function setMuted(m) {
+      muted = m;
+      if (bgmGain) bgmGain.gain.value = muted ? 0 : 0.11;
+      if (sfxGain) sfxGain.gain.value = muted ? 0 : 0.35;
+      try { localStorage.setItem("sd_mute", muted ? "1" : "0"); } catch (e) {}
+      if (muted) stopBgm();
+      else if (unlocked) startBgm();
+      if (muteBtn) {
+        muteBtn.textContent = muted ? "🔇" : "🔊";
+        muteBtn.setAttribute("aria-label", muted ? "소리 켜기" : "소리 끄기");
+      }
+    }
+
+    setMuted(muted);
+    return {
+      unlock: unlock, boost: boost, score: score, crash: crash,
+      resumeBgm: function () { if (!muted && unlocked) startBgm(); },
+      toggleMute: function () { setMuted(!muted); }
+    };
+  })();
+
+  muteBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    audio.toggleMute();
+  });
+
+  // ===================== 게임 로직 =====================
+  var W = canvas.width, H = canvas.height;
+  var GRAVITY = 0.42;
+  var BOOST = -7.2;
+  var GAP = 152;
+  var PILLAR_WIDTH = 54;
+  var SPEED = 2.4;
+  var SPAWN_INTERVAL = 92;
+  var SHIP_X = 72;
+  var SHIP_R = 17;
+  var BEST_KEY = "sd_best";
+
+  var state = "ready";
+  var shipY = H / 2, shipVy = 0, shipRot = 0;
+  var pillars = [];
+  var stars = [];
+  var nebulas = [];
+  var particles = [];
+  var frame = 0;
+  var score = 0;
+  var best = parseInt((function(){ try{return localStorage.getItem(BEST_KEY);}catch(e){return null;} })() || "0", 10);
+  var floorOffset = 0;
+  var boostPulse = 0;
+
+  bestEl.textContent = best;
+
+  // 별 필드 초기화 (고정된 배경별)
+  for (var s = 0; s < 55; s++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 1.6 + 0.3,
+      tw: Math.random() * Math.PI * 2,
+      speed: 0.15 + Math.random() * 0.5
+    });
+  }
+  // 성운 덩어리 (보라/핑크)
+  var NEBULA_DEFS = [
+    { x: 60, y: 100, r: 70, color: "rgba(160,80,220,.16)" },
+    { x: 260, y: 200, r: 90, color: "rgba(255,110,200,.13)" },
+    { x: 150, y: 380, r: 80, color: "rgba(90,160,255,.14)" }
+  ];
+
+  function reset() {
+    state = "ready";
+    shipY = H / 2; shipVy = 0; shipRot = 0;
+    pillars = []; particles = []; frame = 0; score = 0; floorOffset = 0;
+    scoreEl.textContent = "0";
+    nameForm.style.display = "none";
+  }
+
+  function startGame() {
+    if (state === "play") return;
+    state = "play";
+    shipVy = BOOST;
+    pillars = []; particles = []; frame = 0; score = 0;
+    scoreEl.textContent = "0";
+  }
+
+  function flap() {
+    audio.unlock();
+    audio.boost();
+    boostPulse = 12;
+    // 부스터 파티클 생성
+    for (var i = 0; i < 6; i++) {
+      particles.push({
+        x: SHIP_X - SHIP_R * 0.6,
+        y: shipY + (Math.random() - 0.5) * 10,
+        vx: -(1.5 + Math.random() * 2),
+        vy: (Math.random() - 0.5) * 1.5,
+        life: 20 + Math.random() * 10,
+        maxLife: 30
+      });
+    }
+    if (state === "ready") { startGame(); shipVy = BOOST; return; }
+    if (state === "play") shipVy = BOOST;
+    if (state === "dead") { audio.resumeBgm(); reset(); }
+  }
+
+  function spawnPillar() {
+    var minTop = 60;
+    var maxTop = H - 120 - GAP - 60;
+    var hue = Math.random() < 0.5 ? "cyan" : "magenta";
+    pillars.push({ x: W + PILLAR_WIDTH, top: minTop + Math.random() * (maxTop - minTop), scored: false, hue: hue });
+  }
+
+  function circleRect(cx, cy, r, rx, ry, rw, rh) {
+    var nx = Math.max(rx, Math.min(cx, rx + rw));
+    var ny = Math.max(ry, Math.min(cy, ry + rh));
+    var dx = cx - nx, dy = cy - ny;
+    return dx * dx + dy * dy < r * r;
+  }
+
+  function die() {
+    state = "dead";
+    audio.crash();
+    if (score > best) {
+      best = score;
+      try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) {}
+      bestEl.textContent = best;
+    }
+    if (score > 0) {
+      nameForm.style.display = "block";
+    }
+  }
+
+  function update() {
+    floorOffset = (floorOffset + SPEED) % 30;
+
+    stars.forEach(function(st){ st.tw += 0.03; });
+
+    // 파티클 업데이트
+    for (var pi = particles.length - 1; pi >= 0; pi--) {
+      var pt = particles[pi];
+      pt.x += pt.vx; pt.y += pt.vy; pt.life--;
+      if (pt.life <= 0) particles.splice(pi, 1);
+    }
+
+    if (state === "play") {
+      shipVy += GRAVITY;
+      shipY += shipVy;
+      shipRot = Math.min(Math.PI / 2, Math.max(-0.45, shipVy * 0.06));
+      if (frame % SPAWN_INTERVAL === 0) spawnPillar();
+      for (var i = pillars.length - 1; i >= 0; i--) {
+        var p = pillars[i];
+        p.x -= SPEED;
+        if (!p.scored && p.x + PILLAR_WIDTH < SHIP_X) {
+          p.scored = true;
+          score++;
+          scoreEl.textContent = score;
+          audio.score();
+        }
+        if (p.x + PILLAR_WIDTH < -10) pillars.splice(i, 1);
+      }
+      if (shipY - SHIP_R < 0 || shipY + SHIP_R > H - 46) die();
+      for (var j = 0; j < pillars.length; j++) {
+        p = pillars[j];
+        if (circleRect(SHIP_X, shipY, SHIP_R - 4, p.x, 0, PILLAR_WIDTH, p.top) ||
+            circleRect(SHIP_X, shipY, SHIP_R - 4, p.x, p.top + GAP, PILLAR_WIDTH, H - (p.top + GAP) - 46)) die();
+      }
+    }
+    if (state === "ready") { shipY = H / 2 + Math.sin(frame * 0.07) * 10; shipRot = 0; }
+    if (boostPulse > 0) boostPulse--;
+    frame++;
+  }
+
+  function drawBackground() {
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#0d0620");
+    g.addColorStop(0.6, "#150c30");
+    g.addColorStop(1, "#1b0f2e");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // 성운
+    NEBULA_DEFS.forEach(function(n){
+      var ox = ((frame * 0.15) % (W + 200)) - 100;
+      var grad = ctx.createRadialGradient(n.x - ox*0.2, n.y, 0, n.x - ox*0.2, n.y, n.r);
+      grad.addColorStop(0, n.color);
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(n.x - ox*0.2, n.y, n.r, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    // 별
+    stars.forEach(function(st){
+      var alpha = 0.4 + 0.6 * Math.abs(Math.sin(st.tw));
+      ctx.fillStyle = "rgba(220,225,255," + alpha.toFixed(2) + ")";
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+      ctx.fill();
+      st.x -= st.speed;
+      if (st.x < -2) st.x = W + 2;
+    });
+  }
+
+  function drawPillar(p) {
+    var isCyan = p.hue === "cyan";
+    var baseColor = isCyan ? "#37e6d8" : "#e647c9";
+    var glowColor = isCyan ? "rgba(55,230,216,.55)" : "rgba(230,71,201,.55)";
+    var bottomY = p.top + GAP;
+
+    function crystal(x, y, h) {
+      ctx.save();
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 14;
+      var grad = ctx.createLinearGradient(x, y, x + PILLAR_WIDTH, y);
+      grad.addColorStop(0, "rgba(20,10,35,.9)");
+      grad.addColorStop(0.5, baseColor);
+      grad.addColorStop(1, "rgba(20,10,35,.9)");
+      ctx.fillStyle = grad;
+      // 육각 크리스탈 느낌의 다각형
+      ctx.beginPath();
+      ctx.moveTo(x + PILLAR_WIDTH*0.5, y);
+      ctx.lineTo(x + PILLAR_WIDTH, y + 14);
+      ctx.lineTo(x + PILLAR_WIDTH, y + h);
+      ctx.lineTo(x, y + h);
+      ctx.lineTo(x, y + 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      ctx.strokeStyle = "rgba(255,255,255,.5)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x + PILLAR_WIDTH*0.5, y);
+      ctx.lineTo(x + PILLAR_WIDTH, y + 14);
+      ctx.stroke();
+    }
+    crystal(p.x, 0, p.top);
+    crystal(p.x, bottomY, H - bottomY - 46);
+  }
+
+  function drawFloor() {
+    var gh = 46, gy = H - gh;
+    ctx.fillStyle = "#0a0616";
+    ctx.fillRect(0, gy, W, gh);
+    ctx.strokeStyle = "rgba(120,220,255,.35)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, gy + 4);
+    ctx.lineTo(W, gy + 4);
+    ctx.stroke();
+    for (var x = -floorOffset; x < W + 30; x += 30) {
+      ctx.strokeStyle = "rgba(120,220,255,.18)";
+      ctx.beginPath();
+      ctx.moveTo(x, gy + 4);
+      ctx.lineTo(x - 12, gy + gh);
+      ctx.stroke();
+    }
+  }
+
+  function drawParticles() {
+    particles.forEach(function(pt){
+      var a = pt.life / pt.maxLife;
+      ctx.fillStyle = "rgba(255,200,120," + (a*0.8).toFixed(2) + ")";
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 2.5 * a + 0.5, 0, Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  function drawShip() {
+    if (boostPulse > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.3 * (boostPulse / 12);
+      ctx.strokeStyle = "#7ee8ff"; ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(SHIP_X, shipY, SHIP_R + 7 + (12 - boostPulse) * 1.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.translate(SHIP_X, shipY);
+    ctx.rotate(shipRot);
+
+    // 로켓 몸체 (삼각형+캡슐 형태, 새 대신 완전히 다른 실루엣)
+    ctx.shadowColor = "rgba(126,232,255,.6)";
+    ctx.shadowBlur = 8;
+
+    var bodyGrad = ctx.createLinearGradient(-SHIP_R, 0, SHIP_R, 0);
+    bodyGrad.addColorStop(0, "#dfe8ff");
+    bodyGrad.addColorStop(1, "#8fa8ff");
+    ctx.fillStyle = bodyGrad;
+
+    ctx.beginPath();
+    ctx.moveTo(SHIP_R + 6, 0);
+    ctx.lineTo(-SHIP_R*0.5, -SHIP_R*0.75);
+    ctx.lineTo(-SHIP_R*0.9, 0);
+    ctx.lineTo(-SHIP_R*0.5, SHIP_R*0.75);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "#5a6fd8";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    // 캐노피(조종석 창)
+    ctx.fillStyle = "#152238";
+    ctx.beginPath();
+    ctx.ellipse(SHIP_R*0.05, 0, 6, 5, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = "#7ee8ff";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // 후미 불꽃 (엔진 트레일)
+    var flameLen = 8 + (boostPulse > 0 ? boostPulse : 3);
+    var flameGrad = ctx.createLinearGradient(-SHIP_R*0.9, 0, -SHIP_R*0.9 - flameLen, 0);
+    flameGrad.addColorStop(0, "rgba(255,190,90,.9)");
+    flameGrad.addColorStop(1, "rgba(255,80,80,0)");
+    ctx.fillStyle = flameGrad;
+    ctx.beginPath();
+    ctx.moveTo(-SHIP_R*0.9, -4);
+    ctx.lineTo(-SHIP_R*0.9 - flameLen, 0);
+    ctx.lineTo(-SHIP_R*0.9, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawText(lines, sub) {
+    ctx.textAlign = "center";
+    ctx.font = "900 26px Orbitron, sans-serif";
+    ctx.fillStyle = "rgba(0,0,0,.4)";
+    for (var i = 0; i < lines.length; i++) ctx.fillText(lines[i], W / 2 + 2, H * 0.38 + i * 34 + 2);
+    var grad = ctx.createLinearGradient(W/2 - 100, 0, W/2 + 100, 0);
+    grad.addColorStop(0, "#7ee8ff");
+    grad.addColorStop(1, "#ff7ee0");
+    ctx.fillStyle = grad;
+    for (var j = 0; j < lines.length; j++) ctx.fillText(lines[j], W / 2, H * 0.38 + j * 34);
+    if (sub) {
+      ctx.font = "500 14px Orbitron, sans-serif";
+      ctx.fillStyle = "rgba(220,210,255,.9)";
+      ctx.fillText(sub, W / 2, H * 0.55);
+    }
+  }
+
+  function render() {
+    drawBackground();
+    for (var i = 0; i < pillars.length; i++) drawPillar(pillars[i]);
+    drawFloor();
+    drawParticles();
+    drawShip();
+    if (state === "play") {
+      ctx.textAlign = "center";
+      ctx.font = "900 42px Orbitron, sans-serif";
+      ctx.fillStyle = "rgba(126,232,255,.25)";
+      ctx.fillText(String(score), W / 2, 100);
+    }
+    if (state === "ready") drawText(["SPACE DRIFT"], "탭 · 클릭 · 스페이스로 출발");
+    else if (state === "dead") drawText(["충돌 발생", "SCORE " + score], "탭해서 재출발");
+  }
+
+  function loop() { update(); render(); requestAnimationFrame(loop); }
+
+  canvas.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); flap(); });
+  root.addEventListener("keydown", function (e) {
+    if (e.code === "Space" || e.code === "ArrowUp") { e.preventDefault(); flap(); }
+  });
+  root.setAttribute("tabindex", "0");
+
+  reset();
+  requestAnimationFrame(loop);
+
+  // ===================== 구글 시트 랭킹 연동 =====================
+  submitBtn.addEventListener("click", function () {
+    var name = nameInput.value.trim();
+    if (!name) { alert("닉네임을 입력해주세요."); return; }
+    submitBtn.disabled = true;
+    submitBtn.textContent = "등록 중...";
+    fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ name: name, score: score, game: GAME_NAME })
+    })
+    .catch(function (err) { console.error("등록 요청 에러:", err); })
+    .finally(function () {
+      nameForm.style.display = "none";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "랭킹 등록";
+      setTimeout(function () { loadLeaderboard(true); }, 800);
+    });
+  });
+
+  var MIN_INTERVAL_MS = 15000;
+  var lastFetchTime = 0;
+
+  function renderLeaderboard(list) {
+    leaderboardEl.innerHTML = "";
+    if (!list || list.length === 0) {
+      leaderboardEl.innerHTML = "<li>아직 기록이 없습니다.</li>";
+      return;
+    }
+    list.forEach(function (item) {
+      var li = document.createElement("li");
+      li.textContent = item.name + " - " + item.score + "점";
+      leaderboardEl.appendChild(li);
+    });
+  }
+
+  function loadLeaderboard(force) {
+    if (!SCRIPT_URL || SCRIPT_URL.indexOf("여기에") === 0) {
+      leaderboardEl.innerHTML = "<li>랭킹 기능 설정 전입니다.</li>";
+      return;
+    }
+    var now = Date.now();
+    if (!force && (now - lastFetchTime) < MIN_INTERVAL_MS) return;
+    fetch(SCRIPT_URL + "?game=" + encodeURIComponent(GAME_NAME))
+      .then(function (res) {
+        if (res.status === 429) throw new Error("요청 한도 초과(429)");
+        return res.json();
+      })
+      .then(function (list) {
+        lastFetchTime = Date.now();
+        try { sessionStorage.setItem("sdLeaderboardCache", JSON.stringify(list)); } catch (e) {}
+        renderLeaderboard(list);
+      })
+      .catch(function (err) {
+        console.error("랭킹 조회 실패:", err);
+        var cached = null;
+        try { cached = JSON.parse(sessionStorage.getItem("sdLeaderboardCache")); } catch (e) {}
+        if (cached) renderLeaderboard(cached);
+        else leaderboardEl.innerHTML = "<li>랭킹을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.</li>";
+      });
+  }
+
+  loadLeaderboard();
+})();
+</script>
+
+</body>
+</html>
