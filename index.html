@@ -318,8 +318,10 @@
   var BOOST = -7.2;
   var GAP = 152;
   var PILLAR_WIDTH = 54;
-  var SPEED = 2.4;
-  var SPAWN_INTERVAL = 92;
+  var BASE_SPEED = 2.4;
+  var MAX_SPEED = 4.0;
+  var SPEED_GROWTH = 0.0009; // 프레임(약 1/60초)마다 속도가 이만큼씩 미세하게 증가
+  var SPAWN_SPACING = 230; // 파이프 사이 간격(픽셀 거리) 기준 — 속도가 빨라져도 이 거리마다 하나씩 생성
   var SHIP_X = 72;
   var SHIP_R = 17;
   var BEST_KEY = "sd_best";
@@ -335,6 +337,7 @@
   var best = parseInt((function(){ try{return localStorage.getItem(BEST_KEY);}catch(e){return null;} })() || "0", 10);
   var floorOffset = 0;
   var boostPulse = 0;
+  var spawnDistance = 0; // 마지막 파이프 생성 이후 누적 이동 거리
 
   bestEl.textContent = best;
 
@@ -358,7 +361,7 @@
   function reset() {
     state = "ready";
     shipY = H / 2; shipVy = 0; shipRot = 0;
-    pillars = []; particles = []; frame = 0; score = 0; floorOffset = 0;
+    pillars = []; particles = []; frame = 0; score = 0; floorOffset = 0; spawnDistance = 0;
     scoreEl.textContent = "0";
     nameForm.style.display = "none";
   }
@@ -367,7 +370,7 @@
     if (state === "play") return;
     state = "play";
     shipVy = BOOST;
-    pillars = []; particles = []; frame = 0; score = 0;
+    pillars = []; particles = []; frame = 0; score = 0; spawnDistance = 0;
     scoreEl.textContent = "0";
   }
 
@@ -419,7 +422,10 @@
   }
 
   function update() {
-    floorOffset = (floorOffset + SPEED) % 30;
+    // 살아있는 시간(frame)에 비례해 아주 조금씩 빨라지다가 MAX_SPEED에서 멈춤
+    var currentSpeed = Math.min(MAX_SPEED, BASE_SPEED + frame * SPEED_GROWTH);
+
+    floorOffset = (floorOffset + currentSpeed) % 30;
 
     stars.forEach(function(st){ st.tw += 0.03; });
 
@@ -434,10 +440,14 @@
       shipVy += GRAVITY;
       shipY += shipVy;
       shipRot = Math.min(Math.PI / 2, Math.max(-0.45, shipVy * 0.06));
-      if (frame % SPAWN_INTERVAL === 0) spawnPillar();
+      spawnDistance += currentSpeed;
+      if (spawnDistance >= SPAWN_SPACING) {
+        spawnPillar();
+        spawnDistance -= SPAWN_SPACING;
+      }
       for (var i = pillars.length - 1; i >= 0; i--) {
         var p = pillars[i];
-        p.x -= SPEED;
+        p.x -= currentSpeed;
         if (!p.scored && p.x + PILLAR_WIDTH < SHIP_X) {
           p.scored = true;
           score++;
