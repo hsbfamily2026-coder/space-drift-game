@@ -149,7 +149,7 @@
   root.dataset.sdReady = "1";
 
   // ▼▼▼ 배포된 웹앱 주소를 넣으세요 ▼▼▼
-  var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCIPBDBzaL1EA_3p7QzQ5DHCrN_QdjupgNh31F2c1mLFR_j1Ejptx-YYhMZAvn5-YQVw/exec";
+  var SCRIPT_URL = "여기에_배포된_웹앱_URL_붙여넣기";
   var GAME_NAME = "SpaceDrift"; // 새 테마이므로 랭킹 탭도 새로 분리
 
   var canvas = root.querySelector(".sd-canvas");
@@ -724,6 +724,20 @@
   }
 
   loadLeaderboard();
+})();
+</script>
+
+<script>
+// iframe 자동 높이 조절: 부모 페이지(티스토리)에 실제 콘텐츠 높이를 계속 전달
+(function(){
+  function sendHeight(){
+    var h = document.body.scrollHeight;
+    try{ parent.postMessage({ gameFrameHeight: h }, '*'); }catch(e){}
+  }
+  window.addEventListener('load', sendHeight);
+  window.addEventListener('resize', sendHeight);
+  // 랭킹 로딩 등으로 뒤늦게 높이가 바뀌는 경우까지 대비해 주기적으로 갱신
+  setInterval(sendHeight, 800);
 })();
 </script>
 
